@@ -6,3 +6,4 @@ Author: Michael Kellman
 
 ## Requirements
 * Pytorch
+* PytorchComplexOps: (https://github.com/Waller-Lab/PytorchComplexOps) (comes in toolbox)
