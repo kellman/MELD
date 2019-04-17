@@ -222,12 +222,12 @@ class unroll(nn.Module):
         endmem = torch.cuda.memory_cached(self.gpu_device)
         mem = endmem-startmem
         mem = mem / 1024**2
-        print('Memory per iteration:', mem, 'MB')
+#         print('Memory per iteration:', mem, 'MB')
 
         # assess how many checkpoints
         N = len(self.network)
         totalmem = mem * N
-        print('Total memory:', totalmem, 'MB')
+#         print('Total memory:', totalmem, 'MB')
 
         if totalmem > self.memlimit:
             print('Requires memory-efficient learning!')
@@ -235,7 +235,7 @@ class unroll(nn.Module):
             print('Checkpointing every:',int(self.M))
             self.cpList = list(range(int(self.M),int(N-1),int(self.M)))
         else:
-            print('Should just use standard backward...')
+#             print('Should just use standard backward...')
             self.cpList = [-1] #list(range(0,int(N-1)))
             self.M = 1
             
