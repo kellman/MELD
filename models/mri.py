@@ -7,12 +7,7 @@ import sys
 
 sys.path.append('/home/kellman/Workspace/PYTHON/Pytorch_Physics_Library/Utilities/')
 from utility import *
-from optics import *
 from pytorch_complex import *
-from model import *
-sys.path.append('/home/kellman/Workspace/PYTHON/Pytorch_Physics_Library/Denoisers/')
-from pytorch_proximal import *
-from pytorch_transforms import *
 
 mul_c  = ComplexMul().apply
 div_c  = ComplexDiv().apply
@@ -32,24 +27,24 @@ class MRI(nn.Module):
         self.sampling = sampling
       
         # measurements
-        self.y = self.model(img)
+        self.y = self.model(img).to(device)
         self.noise = torch.randn_like(self.y).to(device)
         self.y += self.noise * noise_level
         self.y = self.y.to(device)
         
         # parameters
-        self.alpha = nn.Parameter(alpha)
+        self.alpha = nn.Parameter(alpha).to(device)
         self.testFlag = testFlag
         if testFlag:
             self.alpha.requires_grad_(False)
         
     def forward(self, x, device='cpu'):
-        return x + self.step(x)
+        return x + self.step(x, device=device)
     
     def reverse(self, x, device='cpu'):
         z = x
         for _ in range(self.T):
-            z = x - self.step(z)
+            z = x - self.step(z,device=device)
         return z
 
     def model(self,x,device='cpu'):
@@ -61,11 +56,11 @@ class MRI(nn.Module):
             PFSx[ii,...] = mul_c(self.sampling,PFSx[ii,...])
         return PFSx
     
-    def step(self,x):
-        return -1 * self.alpha * self.grad(x)
+    def step(self,x,device='cpu'):
+        return -1 * self.alpha * self.grad(x, device=device)
     
     def grad(self,x,device='cpu'):
-        AHAx = torch.zeros_like(self.maps)
+        AHAx = torch.zeros_like(self.maps).to(device)
         
         for ii in range(self.maps.shape[0]):
             

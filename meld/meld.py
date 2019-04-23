@@ -205,6 +205,7 @@ class unroll(nn.Module):
         self.memlimit = memlimit
         self.gpu_device = gpu_device
         
+        # setup hybrid checkpointing
         self.setup()
         
     def setup(self):
@@ -216,7 +217,7 @@ class unroll(nn.Module):
         
         x = self.xtest
         for sub in self.network[0]:
-            x = sub(x)
+            x = sub(x,device=self.gpu_device)
         x.backward(self.xtest)
 
         endmem = torch.cuda.memory_cached(self.gpu_device)
@@ -305,7 +306,6 @@ class unroll(nn.Module):
                 else:
                     for jj in range(len(self.network[ii])-1,-1,-1):
                         layer = self.network[ii][jj]
-#                         print(layer)
                         xkm1 = layer.reverse(xkm1,device=self.gpu_device)
 
                 
