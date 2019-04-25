@@ -198,7 +198,7 @@ def setup(layer,x0,memlimit,N,gpu_device):
     return cpList,mem,totalmem,M
 
 class unroll(nn.Module):
-    def __init__(self, network, xtest, memlimit, gpu_device='cpu'):
+    def __init__(self, network, xtest, memlimit, gpu_device='cpu', loss=None):
         super(unroll, self).__init__()
         self.network = network
         self.xtest = xtest
@@ -206,7 +206,14 @@ class unroll(nn.Module):
         self.gpu_device = gpu_device
         
         # setup hybrid checkpointing
+        self.MELD_flag = True
         self.setup()
+        
+        # setup loss function
+        if loss is None:
+            self.lossFunc = lambda x,truth : torch.mean((x-truth)**2)
+        else:
+            self.lossFunc = loss
         
     def setup(self):
         for p_ in self.network[0].parameters(): p_.requires_grad_(True)
@@ -235,8 +242,10 @@ class unroll(nn.Module):
             self.M = np.ceil(totalmem/self.memlimit)
             print('Checkpointing every:',int(self.M))
             self.cpList = list(range(int(self.M),int(N-1),int(self.M)))
+            self.MELD_flag = True
         else:
 #             print('Should just use standard backward...')
+            self.MELD_flag = False
             self.cpList = [-1] #list(range(0,int(N-1)))
             self.M = 1
             
@@ -297,7 +306,7 @@ class unroll(nn.Module):
                     X[ii,...] = xkm1
 
                 # checkpointing
-                if cp > 0 and ii == self.cpList[cp]:
+                if cp >= 0 and ii == self.cpList[cp]:
 #                     print('Using Checkpoint:',ii)
                     xkm1 = self.Xcp[cp,...]
                     cp -= 1
@@ -323,17 +332,31 @@ class unroll(nn.Module):
         return X
     
     def forward(self, x0, xT, interFlag=False, testFlag=False):
-        # evaluate network
-        xN,Xcp,Xforward = self.evaluate(x0, interFlag=interFlag, testFlag=testFlag)
+        # memory-efficient learned design 
+        if self.MELD_flag:
+            # evaluate network
+            xN,Xcp,Xforward = self.evaluate(x0, interFlag=interFlag, testFlag=testFlag)
         
-        # evaluate loss
-        xN = xN.detach().requires_grad_(True)
-        loss = torch.sum((xN-xT)**2)
-        loss.backward()
-        qN = xN.grad
+            # evaluate loss
+            xN = xN.detach().requires_grad_(True)
+            loss = self.lossFunc(xN,xT)
+            loss.backward()
+            qN = xN.grad
+
+            # reverse-mode differentiation
+            Xbackward = self.differentiate(xN,qN,interFlag=interFlag)
+            
+        # standard backpropagation
+        else:
+            # evaluate network
+            xN,Xcp,Xforward = self.evaluate(x0, interFlag=False, testFlag=False)
         
-        # reverse-mode differentiation
-        Xbackward = self.differentiate(xN,qN,interFlag=interFlag)
-        
+            loss = self.lossFunc(xN,xT)
+            loss.backward()
+            
+            # this stuff does not matter as the method is exact.
+            Xbackward = None
+            Xforward = None
+            
         return xN, loss, Xforward, Xbackward # returned for testing/debugging purposes
         

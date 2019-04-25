@@ -5,14 +5,9 @@ import matplotlib.pyplot as plt
 import scipy.io as sio
 import sys
 
-sys.path.append('/home/kellman/Workspace/PYTHON/Pytorch_Physics_Library/Utilities/')
+sys.path.append('/home/kellman/Workspace/PYTHON/MELD/utilities/')
 from utility import *
-from optics import *
 from pytorch_complex import *
-from model import *
-sys.path.append('/home/kellman/Workspace/PYTHON/Pytorch_Physics_Library/Denoisers/')
-from pytorch_proximal import *
-from pytorch_transforms import *
 
 mul_c  = ComplexMul().apply
 div_c  = ComplexDiv().apply
@@ -28,8 +23,7 @@ class Deblur(nn.Module):
         self.T = T
       
         # point spread function (put design parameters in here)
-        self.psf = torch.from_numpy(kernel).type(dtype)
-        self.psf /= torch.sum(self.psf)    
+        self.psf = kernel/torch.sum(kernel)    
         tmp = torch.stack((self.psf ,torch.zeros_like(self.psf)),2)
         self.fpsf = torch.fft(tmp,2)
         self.fpsf = self.fpsf.to(device)
