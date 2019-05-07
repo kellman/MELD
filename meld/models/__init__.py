@@ -1,2 +1,2 @@
-from meld.models import deconv, pytorch_proximal, pytorch_transforms
-__all__ = ['deconv', 'pytorch_proximal', 'pytorch_transforms']
+from meld.models import deconv, deconv_full_inv, pytorch_proximal, pytorch_transforms
+__all__ = ['deconv', 'deconv_full_inv', 'pytorch_proximal', 'pytorch_transforms']

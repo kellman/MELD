@@ -211,7 +211,7 @@ class unroll(nn.Module):
         
         # setup loss function
         if loss is None:
-            self.lossFunc = lambda x,truth : torch.mean((x-truth)**2)
+            self.lossFunc = lambda x,truth : torch.sum((x-truth)**2)
         else:
             self.lossFunc = loss
         

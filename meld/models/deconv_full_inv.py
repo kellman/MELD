@@ -5,9 +5,9 @@ import matplotlib.pyplot as plt
 import scipy.io as sio
 import sys
 
-sys.path.append('/home/kellman/Workspace/PYTHON/MELD/utilities/')
-from utility import *
-from pytorch_complex import *
+# sys.path.append('/home/kellman/Workspace/PYTHON/MELD/utilities/')
+from meld.util.utility import *
+from meld.util.pytorch_complex import *
 
 mul_c  = ComplexMul().apply
 div_c  = ComplexDiv().apply
