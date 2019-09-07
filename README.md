@@ -1,16 +1,25 @@
 # Memory-efficient Learned Design
+**Author:** Michael Kellman (kellman at berkeley dot edu)
 
+Computational imaging systems jointly design computation and hardware to retrieve rich information which is not traditionally accessible with standard imaging systems. Recently, critical aspects such as experimental design and image priors are being optimized through deep neural networks formed by the unrolled iterations of classical physics-based reconstructions (termed physics-based networks). However, for real-world large-scale systems, computing gradients via backpropagation restricts learning due to memory limitations of graphical processing units. In this toolbox, we implement the memory-efficient learning procedure described in [1] that exploits the reversibility of the network's layers to enable data-driven design for large-scale computational imaging. We include several practical demonstrations on large-scale systems: 
 
-Author: Michael Kellman (kellman at berkeley dot edu)
-
-
+* Learning experimental design for super-resolution optical microscopy (Fourier Ptychography)
+* Learning prior models for multi-channel parallel magnetic resonance imaging (MRI)
 
 ## Requirements
 * Pytorch
-* PytorchComplexOps: (https://github.com/Waller-Lab/PytorchComplexOps) (comes in toolbox)
-* SigPy (https://pypi.org/project/sigpy/)
+* Numpy
+
+## Custom template for your own computational imaging needs
+
+
 
 ## Citations
+
+If you find this library research please cite:
+```
+
+```
 
 If you find the Fourier Ptychographic Microscopy model useful please cite:
 ```
