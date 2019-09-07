@@ -1,11 +1,8 @@
 import torch
 import torch.nn as nn
 import numpy as np
-import matplotlib.pyplot as plt
 import scipy.io as sio
-import sys
 
-# sys.path.append('/home/kellman/Workspace/PYTHON/MELD/utilities/')
 from meld.util.utility import *
 from meld.util.pytorch_complex import *
 
@@ -15,29 +12,30 @@ abs_c  = ComplexAbs().apply
 abs2_c = ComplexAbs2().apply 
 exp_c  = ComplexExp().apply
 
-class Deblur(nn.Module):
-    def __init__(self, Np, img, kernel, alpha = 1e-2, lamb=1e-1, noise_level=1e-2, T=4, testFlag=False, device='cpu'):
-        super(Deblur,self).__init__()
+class deconv(nn.Module):
+    def __init__(self, Np, img, kernel, alpha, noise_level=1e-2, T=4, testFlag=False, fullInvFlag=False, device='cpu'):
+        super(deconv,self).__init__()
     
         self.Np = Np
         self.T = T
       
         # point spread function (put design parameters in here)
-        self.psf = kernel/torch.sum(kernel)    
+        self.psf = kernel/torch.sum(kernel)
         tmp = torch.stack((self.psf ,torch.zeros_like(self.psf)),2)
         self.fpsf = torch.fft(tmp,2)
         self.fpsf = self.fpsf.to(device)
         
         # measurements
-        self.xtruth = img
-        self.y = self.blur(img)
+        self.xtruth = torch.from_numpy(img).to(device)
+        self.y = self.blur(torch.from_numpy(img).to(device))
         self.noise = torch.randn_like(self.y).to(device)
         self.y += self.noise * noise_level
         self.y = self.y.to(device)
         
         # parameters
-        self.alpha = nn.Parameter(alpha)
+        self.alpha = alpha # nn.Parameter(alpha)
         self.testFlag = testFlag
+        self.fullInvFlag = fullInvFlag
         if testFlag:
             self.alpha.requires_grad_(False)
            
@@ -47,21 +45,28 @@ class Deblur(nn.Module):
     
     def reverse(self, z, device='cpu'):
         with torch.no_grad():
-            ys = torch.stack((self.y,torch.zeros_like(self.y)),2)
-            Fy = torch.fft(ys,2)
-            AHy = torch.ifft(mul_c(conj(self.fpsf),Fy),2)[...,0]
-            aAHy = self.alpha * AHy
-            
-            xkpaAHy = z - aAHy
+            if self.fullInvFlag:
+                ys = torch.stack((self.y,torch.zeros_like(self.y)),2)
+                Fy = torch.fft(ys,2)
+                AHy = torch.ifft(mul_c(conj(self.fpsf),Fy),2)[...,0]
+                aAHy = self.alpha * AHy
 
-            ts = torch.stack((xkpaAHy,torch.zeros_like(xkpaAHy)),2)
-            Ft = torch.fft(ts,2)
-            AHA = mul_c(conj(self.fpsf),self.fpsf)
-            I = torch.zeros_like(AHA)
-            I[...,0] = 1
-            ImaAHA = I - self.alpha*AHA
-            out = torch.ifft(div_c(Ft,ImaAHA),2)
-            return out[...,0]
+                xkpaAHy = z - aAHy
+
+                ts = torch.stack((xkpaAHy,torch.zeros_like(xkpaAHy)),2)
+                Ft = torch.fft(ts,2)
+                AHA = mul_c(conj(self.fpsf),self.fpsf)
+                I = torch.zeros_like(AHA)
+                I[...,0] = 1
+                ImaAHA = I - self.alpha*AHA
+                x = torch.ifft(div_c(Ft,ImaAHA),2)
+                return x[...,0]
+            else:
+                x = z
+                for _ in range(self.T):
+                    x = z - self.step(x)
+                return x
+    
 
     def blur(self,img):
         img = torch.stack((img,torch.zeros_like(img)),2)

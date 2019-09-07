@@ -1,13 +1,6 @@
 import torch
 import torch.nn as nn
 import numpy as np
-import matplotlib.pyplot as plt
-from skimage import data
-from skimage.transform import resize
-import scipy.io as sio
-import sys
-from torch.utils.data import Dataset, DataLoader
-
 from meld.util.pytorch_complex import *
 from meld.util.utility import * 
 
@@ -22,6 +15,7 @@ class Wavelet2(nn.Module):
         super(Wavelet2, self).__init__()
         self.Np = Np
         self.c = torch.from_numpy(np.asarray([1/np.sqrt(4)])).type(dtype).to(device)
+        
     def forward(self,x,shiftx=False,shifty=False,device='cpu'):
         if shiftx: x = roll2(x,1)
         if shifty: x = roll2(x.permute(1,0),1)

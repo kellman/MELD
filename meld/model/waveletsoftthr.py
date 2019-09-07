@@ -1,13 +1,11 @@
 import torch
 import torch.nn as nn
 import numpy as np
-import matplotlib.pyplot as plt
 from meld.util.pytorch_complex import *
-from skimage import data
-from skimage.transform import resize
-import scipy.io as sio
-import sys
-from meld.models.pytorch_transforms import *
+from meld.model.pytorch_transforms import Wavelet2
+
+np_dtype = np.float32
+dtype = torch.float32
 
 mul_c  = ComplexMul().apply
 div_c  = ComplexDiv().apply
@@ -15,50 +13,13 @@ abs_c  = ComplexAbs().apply
 abs2_c = ComplexAbs2().apply 
 exp_c  = ComplexExp().apply
 
-class Conv2dSame(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size, bias=True, padding_layer=torch.nn.ReflectionPad2d):
-        super().__init__()
-        ka = kernel_size // 2
-        kb = ka - 1 if kernel_size % 2 == 0 else ka
-        self.net = torch.nn.Sequential(
-            padding_layer((ka,kb,ka,kb)),
-            torch.nn.Conv2d(in_channels, out_channels, kernel_size, bias=bias)
-        )
-    def forward(self, x):
-        return self.net(x)
-
-class ResNet3(nn.Module):
-    def __init__(self, num_filters=32, filter_size=3, T=4):
-        super(ResNet3, self).__init__()
-        self.model = nn.Sequential(
-            Conv2dSame(1,num_filters,filter_size),
-            nn.ReLU(),
-            Conv2dSame(num_filters,num_filters,filter_size),
-            nn.ReLU(),
-            Conv2dSame(num_filters,1,filter_size)
-        )
-        self.T = T
-        
-    def forward(self,x,device='cpu'):
-        return x + self.step(x,device=device)
-    
-    def step(self,x,device='cpu'):
-        x = x.unsqueeze(0).unsqueeze(0)
-        return self.model(x).squeeze(0).squeeze(0)
-    
-    def reverse(self, x, device='cpu'):
-        z = x
-        for _ in range(self.T):
-            z = x - self.step(z)
-        return z
-    
-class WaveletSoftThr(nn.Module):
+class wavelet_soft_thr(nn.Module):
     def __init__(self, Np, thr, alpha, testFlag = False,device='cpu'):
-        super(WaveletSoftThr, self).__init__()
+        super(wavelet_soft_thr, self).__init__()
         self.testFlag = testFlag
         self.alpha = alpha
         self.thr = thr
-        self.prox = invSoftThr(thr,alpha,testFlag)
+        self.prox = inv_soft_thr2(thr, alpha, testFlag)
         self.trans = Wavelet2(Np,device=device)
         self.device = device
         
@@ -79,13 +40,13 @@ class WaveletSoftThr(nn.Module):
         return lamb * torch.sum(torch.abs(a[1]) + torch.abs(a[2]) + torch.abs(a[3]))
 
     
-class AbsWaveletSoftThr(nn.Module):
+class abs_wavelet_soft_thr(nn.Module):
     def __init__(self, Np, thr, alpha, testFlag = False,device='cpu'):
-        super(AbsWaveletSoftThr, self).__init__()
+        super(abs_wavelet_soft_thr, self).__init__()
         self.testFlag = testFlag
         self.alpha = alpha
         self.thr = thr
-        self.prox = invSoftThr(thr,alpha,testFlag)
+        self.prox = inv_soft_thr(thr,alpha,testFlag)
         self.trans = Wavelet2(Np,device=device)
         self.device = device
         
@@ -120,9 +81,9 @@ class AbsWaveletSoftThr(nn.Module):
         return torch.stack((a_amp * torch.cos(a_angle), a_amp * torch.sin(a_angle)),2)
     
     
-class invSoftThr(nn.Module):
+class inv_soft_thr(nn.Module):
     def __init__(self, thr, alpha, testFlag = False):
-        super(invSoftThr, self).__init__()
+        super(inv_soft_thr, self).__init__()
         self.testFlag = testFlag
         self.alpha = alpha
         self.thr = nn.Parameter(torch.from_numpy(np.asarray([thr],dtype=np_dtype)))
@@ -138,19 +99,21 @@ class invSoftThr(nn.Module):
         z += x * (1 / self.alpha) * (torch.abs(x) <= self.thr * self.alpha).type(dtype)
         return z
     
-class invSoftThr2(nn.Module):
+class inv_soft_thr2(nn.Module):
     def __init__(self, thr, alpha, testFlag = False):
-        super(invSoftThr2, self).__init__()
+        super(inv_soft_thr2, self).__init__()
         self.testFlag = testFlag
         self.alpha = alpha
-        self.thr = thr
+        self.thr = nn.Parameter(torch.from_numpy(np.asarray([thr],dtype=np_dtype)))
+        self.thr.requires_grad_(not self.testFlag)
         
     def forward(self,x,device='cpu'):
         return self.alpha * x * (torch.abs(x) <= self.thr).type(dtype) + (x - self.thr*(1-self.alpha)) * (x > self.thr).type(dtype) + (x + self.thr*(1-self.alpha)) * (x < -1 * self.thr).type(dtype)
     
     def reverse(self,x,device='cpu'):
         thr2 = self.thr*self.alpha
-        return x / self.alpha * (torch.abs(x) <= thr2).type(dtype) + (x + self.thr*(1-self.alpha)) * (x > thr2).type(dtype) + (x - self.thr*(1-self.alpha)) * (x < -1 * thr2).type(dtype)
+        invslope = (1 / self.alpha)
+        return x * invslope * (torch.abs(x) <= thr2).type(dtype) + (x + self.thr*(1-self.alpha)) * (x > thr2).type(dtype) + (x - self.thr*(1-self.alpha)) * (x < -1 * thr2).type(dtype)
     
 class shrinkage(nn.Module):
     def __init__(self, thr, testFlag = False):
@@ -165,9 +128,9 @@ class shrinkage(nn.Module):
     def reverse(self,z,device='cpu'):
         return z * (1 + self.thr)
     
-class SoftThr(nn.Module):
+class soft_thr(nn.Module):
     def __init__(self, thr, testFlag = False):
-        super(SoftThr, self).__init__()
+        super(soft_thr, self).__init__()
         self.testFlag = testFlag
         self.thr = nn.Parameter(torch.from_numpy(np.asarray([thr],dtype=np_dtype)))
         self.thr.requires_grad_(not self.testFlag)
