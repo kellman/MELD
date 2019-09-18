@@ -1,7 +1,9 @@
 import torch
 import torch.nn as nn
 import numpy as np
-import scipy.io as sio
+import scipy as sp
+
+from meld.model import pbn_layer
 
 from meld.util.utility import *
 from meld.util.pytorch_complex import *
@@ -12,7 +14,7 @@ abs_c  = ComplexAbs().apply
 abs2_c = ComplexAbs2().apply 
 exp_c  = ComplexExp().apply
 
-class deconv(nn.Module):
+class deconv(pbn_layer):
     def __init__(self, Np, img, kernel, alpha, noise_level=1e-2, T=4, testFlag=False, fullInvFlag=False, device='cpu'):
         super(deconv,self).__init__()
     

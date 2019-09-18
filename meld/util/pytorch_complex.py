@@ -113,7 +113,6 @@ class ComplexExp(torch.autograd.Function):
         assert input.shape[-1]==2, "Complex tensor should have real and imaginary parts."
         output         = input.clone()
         amplitude      = torch.exp(input[..., 0])
-        # amplitude      = input[..., 0]
         output[..., 0] = amplitude*torch.cos(input[..., 1])
         output[..., 1] = amplitude*torch.sin(input[..., 1])
         

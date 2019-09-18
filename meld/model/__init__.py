@@ -1,3 +1,5 @@
+from .pbn_layer import pbn_layer
+
 from .fpm import fpm
 from .deconv import deconv
 

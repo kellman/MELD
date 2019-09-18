@@ -1,20 +1,10 @@
-import os
-import argparse
-import time
+import torch
+import torch.nn as nn
+
 import numpy as np
-import sys
-import matplotlib.pyplot as plt
-import sigpy.plot as pl
-import scipy.io as sio
+import scipy as sp
 
-import torch
-import torch.nn as nn
-import torch.optim as optim
-import torch.autograd as ag
-
-import torch
-import torch.nn as nn
-from torch.utils.data import Dataset, DataLoader, SequentialSampler, BatchSampler
+from meld.model import pbn_layer
 
 from meld.util import utility
 from meld.util import pytorch_complex
@@ -38,52 +28,8 @@ def F(x):
 def iF(x):
     return np.fft.fftshift(np.fft.ifft2(np.fft.ifftshift(x)))
 
-
-class FPMDataset(Dataset):
-
-    def __init__(self, mat_file, root_dir, truth=None, cleanMeas = None, noisyMeas=None):
-        """
-        Args:
-            mat_file (string): Path to the csv file with annotations.
-            root_dir (string): Directory with all the images.
-            transform (callable, optional): Optional transform to be applied
-                on a sample.
-        """
-#         self.d = sio.loadmat(mat_file)
-        self.root_dir = root_dir
-        self.mat_file = mat_file
-#         print(self.root_dir + self.mat_file)
-        
-        self.truth = truth
-        self.cleanMeas = cleanMeas
-        self.noisyMeas = noisyMeas # can also be clean, but is optionally noisy
-
-    def __len__(self):
-        return self.truth.shape[0]
-    
-    def __getitem__(self, idx):
-        return torch.from_numpy(self.noisyMeas[idx,...].astype(np_dtype)), torch.from_numpy(self.truth[idx,...].astype(np_dtype))
-    
-    def loadDataset(self, ):
-        d = sio.loadmat(self.root_dir + self.mat_file)
-        self.truth = d['truth']
-        self.cleanMeas = d['clean']
-        self.noisyMeas = d['noisy']
-        print(self.truth.shape, self.cleanMeas.shape, self.noisyMeas.shape)
-        return d
-    
-    def saveDataset(self, specs = {}):
-        import os
-        directory = os.path.dirname(self.root_dir)
-        if not os.path.exists(directory):
-            os.makedirs(directory)
-        d = {'truth':self.truth,'clean':self.cleanMeas,'noisy':self.noisyMeas}
-        specs = {**d, **specs}
-        print([a for a,b in specs.items()])
-        sio.savemat(self.root_dir + self.mat_file,specs)
-
-
-class fpm(nn.Module):
+class fpm(pbn_layer):
+# class fpm(nn.Module):
     def __init__(self, Np, na, na_illum, na_list, wl, ps, mag, alpha, maxIter, measurements, C_init = None, T=4, testFlag = False, device='cpu'):
         super(fpm, self).__init__()
 
@@ -188,6 +134,8 @@ class fpm(nn.Module):
         return g
     
     def generateSingleMeas(self,field,device="cpu"):
+        self.planewaves = self.planewaves.to(device)
+        self.P = self.P.to(device)
         output = mul_c(self.planewaves,field)
         output = torch.fft(output,2)
         output = mul_c(self.P, output)
@@ -196,6 +144,8 @@ class fpm(nn.Module):
         return output
     
     def generateMultiMeas(self,field,device="cpu"):
+        self.planewaves = self.planewaves.to(device)
+        self.P = self.P.to(device)
         output = mul_c(self.planewaves,field)
         output = torch.fft(output,2)
         output = mul_c(self.P, output)
