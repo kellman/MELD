@@ -7,6 +7,8 @@ from meld.model.pytorch_transforms import Wavelet2
 
 from meld.model import pbn_layer
 
+from collections import OrderedDict
+
 mul_c  = ComplexMul().apply
 div_c  = ComplexDiv().apply
 abs_c  = ComplexAbs().apply
@@ -51,15 +53,25 @@ class ResNet3(pbn_layer):
         return z
     
 class ResNet4(pbn_layer):
-    def __init__(self, num_filters=32, filter_size=3, T=4):
+    def __init__(self, num_filters=32, filter_size=3, T=4, num_layers=3):
         super(ResNet4, self).__init__()
-        self.model = nn.Sequential(
-            Conv2dSame(2,num_filters,filter_size),
-            nn.ReLU(),
-            Conv2dSame(num_filters,num_filters,filter_size),
-            nn.ReLU(),
-            Conv2dSame(num_filters,2,filter_size)
-        )
+        
+        layer_dict = OrderedDict()
+        layer_dict['conv1'] = Conv2dSame(2,num_filters,filter_size)
+        layer_dict['relu1'] = nn.ReLU()
+        for i in range(num_layers-2):
+            layer_dict[f'conv{i+2}'] = Conv2dSame(num_filters,num_filters,filter_size)
+            layer_dict[f'relu{i+2}'] = nn.ReLU()
+        layer_dict[f'conv{num_layers}'] = Conv2dSame(num_filters,2,filter_size)
+        
+#         self.model = nn.Sequential(
+#             Conv2dSame(2,num_filters,filter_size),
+#             nn.ReLU(),
+#             Conv2dSame(num_filters,num_filters,filter_size),
+#             nn.ReLU(),
+#             Conv2dSame(num_filters,2,filter_size)
+#         )
+        self.model = nn.Sequential(layer_dict)
         self.T = T
         
     def forward(self,x,device='cpu'):
@@ -67,6 +79,7 @@ class ResNet4(pbn_layer):
     
     def step(self,x,device='cpu'):
         # reshape (batch,x,y,channel=2) -> (batch,channel=2,x,y)
+#         print(x.size())
         x = x.permute(0, 3, 1, 2)
         y = self.model(x)
         # reshape (batch,channel=2,x,y) -> (batch,x,y,channel=2)
