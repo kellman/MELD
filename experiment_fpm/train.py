@@ -72,7 +72,8 @@ if __name__ == '__main__':
     device = torch.device("cuda:"+str(args.gpu) if torch.cuda.is_available() else "cpu")
         
     # Load dataset
-    path = '/home/kellman/Workspace/PYTHON/Design_FPM_pytorch/datasets_train_iccp_results/train_amp_exp_n10000.mat' 
+    path = args.path
+#     path = '/home/kellman/Workspace/PYTHON/Design_FPM_pytorch/datasets_train_iccp_results/train_amp_exp_n10000.mat' 
     dataset = dataloader.dataloader(path, args.num_batches, args.batch_size, device)
     metadata = dataset.getMetadata()
     metadata['Np'] = dataset[0][0].shape[2:]

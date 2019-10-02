@@ -176,7 +176,7 @@ class UnrolledNetwork():
         # standard backpropagation
         else:
             # evaluate network
-            xN,Xcp,Xforward = self.evaluate(x0, interFlag=False, testFlag=False)
+            xN,Xcp,Xforward = self.evaluate(x0, interFlag=interFlag, testFlag=False)
             # evaluate loss function
             loss = self.lossFunc(xN,truth)
             # reverse-mode differentiation

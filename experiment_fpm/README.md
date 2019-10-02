@@ -50,3 +50,10 @@ Experiment #7: More measurements: darkfield (7) and brightfield (1). MELD versio
 python train.py  --verbose True --num_iter 200 --batch_size 5 --test_freq 3 --step_size 0.0025 --num_unrolls 100 --alpha 0.4 --tensorboard True --gpu 3 --num_df 7
 
 python train.py  --verbose True --num_iter 200 --batch_size 5 --test_freq 3 --step_size 0.0025 --num_unrolls 100 --alpha 0.4 --tensorboard True --gpu 3 --num_df 7 --meldFlag=True --memlimit 750
+
+
+## large-scale learning for TCI paper
+
+Experiment #1: Many measurements 20 (1/19)?
+
+python train.py  --verbose True --num_iter 10 --batch_size 1 --test_freq 1 --step_size 0.01 --num_unrolls 100 --alpha 0.25 --tensorboard True --gpu 3 --num_df 19 --path /home/kellman/Workspace/PYTHON/Design_FPM_pytorch/datasets_train_ode_test/train_amp_exp_10000_293leds.mat
