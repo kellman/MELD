@@ -9,29 +9,39 @@ import h5py
 import pathlib
 import time
 import lib_complex as cp
+from torch.utils.data import Dataset
+# from mri import sense_adj
 
-class dataloader():
-    def __init__(self, path, num_batches, batch_size, noise_std, device='cpu'):
+class dataloader(Dataset):
+    def __init__(self, path, noise_std):
         super(dataloader,self).__init__()
 
         self.path = path
-        self.num_batches = num_batches
-        self.batch_size = batch_size
-        self.device = device
+#         self.num_batches = num_batches
+#         self.batch_size = batch_size
+#         self.device = device
         self.noise_std = noise_std
+        self.np_dtype = np.float32
         
     def __len__(self,):
-        return self.num_batches * self.batch_size
+        with h5py.File(self.path, 'r') as F:
+            return F['imgs'].shape[0]
     
     def __getitem__(self, idx):
-        start_idx = self.batch_size * idx
-        end_idx = self.batch_size * (idx + 1)
-        indices = [idx for idx in range(start_idx,end_idx)]
-        imgs, maps, masks = load_data(indices, self.path)
+#         start_idx = self.batch_size * idx
+#         end_idx = self.batch_size * (idx + 1)
+#         indices = [idx for idx in range(start_idx,end_idx)]
+        imgs, maps, masks = load_data(idx, self.path)
         meas = self._sim_data(imgs, maps, masks)
-        print(imgs.shape, maps.shape, masks.shape)
-        print(meas.shape)
-        return meas, maps, masks, imgs
+        imgs_0 = torch.tensor(cp.c2r(imgs).astype(self.np_dtype))
+        maps_0 = torch.tensor(cp.c2r(maps).astype(self.np_dtype))
+        meas_0 = torch.tensor(cp.c2r(meas).astype(self.np_dtype))
+        mask_0 = torch.tensor(masks.astype(self.np_dtype))
+#         adj = sense_adj(meas_0, maps_0, mask_0)
+#         print(imgs.shape, maps.shape, masks.shape)
+#         print(meas.shape)
+#         return meas_0, maps_0, masks, imgs_0
+        return imgs_0.squeeze(0), maps_0.squeeze(0), meas_0.squeeze(0), mask_0.squeeze(0)
     
     def _sim_data(self, imgs, maps, masks, ksp=None):
 
@@ -50,6 +60,7 @@ def load_data(idx, data_file, gen_masks=False):
         maps = np.array(F['maps'][idx,...], dtype=np.complex)
         if not gen_masks:
             try:
+#                 print(F['masks'].shape)
                 masks = np.array(F['masks'][idx,...], dtype=np.float)
             except:
                 masks = poisson_mask(imgs.shape, seed=idx)

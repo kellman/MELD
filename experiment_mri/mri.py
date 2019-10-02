@@ -13,10 +13,11 @@ import lib_complex as cp
 np_dtype = np.float32
 
 class MultiChannelMRI(nn.Module):
-    def __init__(self, ndim=2, alpha=1e-2, mu=1e-2, testFlag=False, device='cpu'):
+    def __init__(self, ndim=2, alpha=1e-2, mu=1e-2, testFlag=False, device='cpu', verbose=False):
         super(MultiChannelMRI,self).__init__()
     
         assert ndim == 2, '3D not yet supported!'
+        # 3d support?
 
         self.ndim = ndim
         
@@ -25,6 +26,7 @@ class MultiChannelMRI(nn.Module):
         self.mask = None
         self.ksp = None
         self.adjoint = None
+        self.verbose = verbose
         
         # parameters
         self.alpha = nn.Parameter(torch.from_numpy(np.asarray([alpha]).astype(np_dtype))).to(device)
@@ -33,10 +35,10 @@ class MultiChannelMRI(nn.Module):
         if testFlag:
             self.alpha.requires_grad_(False)
 
-    def batch(self, imgs, maps, mask, ksp):
+    def batch(self, imgs, maps, ksp, mask, device='cpu'):
 
         self.truth, self.maps, self.mask, self.ksp = imgs, maps, mask, ksp
-        self.adjoint = self.model_adjoint(self.ksp) # setup 
+        self.adjoint = self.model_adjoint(self.ksp).to(device) # setup 
 
         return self.adjoint
         
@@ -46,10 +48,10 @@ class MultiChannelMRI(nn.Module):
                         self.adjoint + self.mu * x, 
                         self.model_reg_normal, 
                         max_iter = max_iter,
-                        eps = eps) 
+                        eps = eps, verbose = self.verbose) 
 
     def reverse(self, x, device='cpu'):
-        pass
+        return (1/self.mu) * (self.model_reg_normal(x) - self.adjoint)
     
     def model(self, x, device='cpu'):
         return sense_forw(x, self.maps, self.mask, ndim=self.ndim)
@@ -83,6 +85,7 @@ def fft_adj(x, ndim=2):
     return torch.ifft(x, signal_ndim=ndim, normalized=True)
 
 def mask_forw(y, mask, ndim=2):
+#     print(y.size(), mask.size())
     return y * mask[:,None,:,:,None]
 
 def sense_forw(img, maps, mask, ndim=2):
@@ -131,7 +134,7 @@ def conjgrad(x, b, Aop_fun, max_iter=50, l2lam=0., eps=1e-4, verbose=True):
     reshape = (-1,) + (1,) * (len(x.shape) - 1)
     for i in range(max_iter):
         
-        if rsnew.max() < eps:
+        if rsnew.max() < eps and verbose:
             # print this value...
             print('Hit eps after', i)
             break
