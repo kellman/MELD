@@ -80,5 +80,5 @@ class model():
         
         x0 = torch.zeros(data.shape[1],data.shape[2],2)
         x0[:,:,0] = data[0,:,:]
-        x0 = x0.to(device)
+#         x0 = x0.to(device)
         return x0

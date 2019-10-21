@@ -1,7 +1,6 @@
 """Trains the model in model.py on loaded dataset.
 
-python train.py --verbose True --num_iter 100 --batch_size 5 --test_freq 1 
---step_size 0.01 --num_unrolls 75 --alpha 0.1 --tensorboard True --meldFlag=True      
+python train.py --verbose True --num_iter 100 --batch_size 5 --test_freq 1 --step_size 0.01 --num_unrolls 75 --alpha 0.1 --tensorboard True --meldFlag=True --path /home/kellman/Workspace/PYTHON/Design_FPM_pytorch/datasets_train_iccp_results/train_amp_exp_n10000.mat
 
 """
 import os
@@ -116,7 +115,7 @@ if __name__ == '__main__':
     # Setup tensorboard writer
     exp_string = 'batch_size={0:d}_stepsize={1:.3f}_loss_fn={8:}_optim={2:}_num_unrolls={3:d}_alpha={4:.3f}_num_df={5:d}_num_bf={6:d}_num_leds={7:d}_meld={9:}'.format(args.batch_size, args.step_size, args.optim, args.num_unrolls, args.alpha, args.num_df, args.num_bf, metadata['Nleds'], args.loss, trainable_network.meldFlag)
     exp_time = get_time_stamp()
-    exp_dir = './runs/' + exp_time + exp_string
+    exp_dir = './runs_large_debug/' + exp_time + exp_string
     if args.verbose: print(exp_dir)
     if args.tensorboard: 
         writer = SummaryWriter(exp_dir)
@@ -131,7 +130,7 @@ if __name__ == '__main__':
         # forward evaluation (loop over batches)
         loss_training = 0.
         network.network.zero_grad()
-        for bb in range(args.batch_size):
+        for bb in range(input_data.shape[0]):
             zgFlag = bb == 0
             start_time = time.time()
             x0 = network.initialize(input_data[bb:bb+1,...].to(device), device=device)
@@ -152,7 +151,7 @@ if __name__ == '__main__':
             
             # forward evaluation (loop over batches)
             loss_testing = 0.
-            for bb in range(args.batch_size):
+            for bb in range(input_data.shape[0]):
                 x0 = network.initialize(input_data[bb:bb+1,...].to(device), device=device)
                 x, loss_tmp = trainable_network.loss_eval(x0,output_data[bb:bb+1,...].to(device))
                 with torch.no_grad():

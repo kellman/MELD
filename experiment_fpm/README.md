@@ -56,4 +56,4 @@ python train.py  --verbose True --num_iter 200 --batch_size 5 --test_freq 3 --st
 
 Experiment #1: Many measurements 20 (1/19)?
 
-python train.py  --verbose True --num_iter 10 --batch_size 1 --test_freq 1 --step_size 0.01 --num_unrolls 100 --alpha 0.25 --tensorboard True --gpu 3 --num_df 19 --path /home/kellman/Workspace/PYTHON/Design_FPM_pytorch/datasets_train_ode_test/train_amp_exp_10000_293leds.mat
+python train.py  --verbose True --num_iter 200 --num_batches 5 --batch_size 2 --test_freq 1 --step_size 0.005 --num_unrolls 300 --alpha 0.1 --tensorboard True --gpu 0 --num_df 19 --num_bf 1 --T 4 --meldFlag True --path /home/kellman/Workspace/PYTHON/Design_FPM_pytorch/datasets_train_ode_test/train_amp_exp_10000_293leds.mat

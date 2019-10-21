@@ -19,7 +19,7 @@ def makeNetwork(opList, N):
     return genNetwork(nn.ModuleList(opList), N)
 
 class UnrolledNetwork():
-    def __init__(self, network, xtest, memlimit, loss=None, setupFlag=True, device='cpu'):
+    def __init__(self, network, xtest, memlimit, loss=None, setupFlag=True, ckptFlag=0, device='cpu'):
         super(UnrolledNetwork, self).__init__()
         self.network = network
         self.xtest = xtest
@@ -29,42 +29,73 @@ class UnrolledNetwork():
         # setup hybrid checkpointing
         self.meldFlag = True # default
         self.cpList = [-1] # default
-        if setupFlag: self.setup()
         
         # setup loss function
         if loss is None:
             self.lossFunc = lambda x,truth : torch.mean((x-truth)**2)
         else:
             self.lossFunc = loss
+            
+        if setupFlag: 
+            self.setup()
+        
+        if ckptFlag != 0:
+            N = len(network)
+            self.cpList = np.sort(list(np.linspace(int(N-ckptFlag),1,int(ckptFlag), dtype=np.int32)))
         
     def setup(self):
         for p_ in self.network.parameters(): p_.requires_grad_(True)
+            
+        # compute storage memory of single checkpoint
+        torch.cuda.empty_cache()
+        startmem = torch.cuda.memory_cached(self.gpu_device)
+        self.xtest = self.xtest.to(self.gpu_device)
+        endmem = torch.cuda.memory_cached(self.gpu_device)
+        mem3 = (endmem - startmem) / 1024**2
+        print('Memory per checkpoint: {0:d}MB'.format(int(mem3)))
+        torch.cuda.empty_cache()
+        
 
-        # test memory requirements
+        # test memory requirements (offset + single layer)
         torch.cuda.empty_cache()
         startmem = torch.cuda.memory_cached(self.gpu_device)
         
         x = self.xtest
         for sub in self.network[0]:
             x = sub(x,device=self.gpu_device)
-        x.backward(self.xtest)
+        loss = self.lossFunc(x,self.xtest)
+        loss.backward()
 
         endmem = torch.cuda.memory_cached(self.gpu_device)
-        mem = endmem-startmem
-        mem = mem / 1024**2
-        print('Memory per iteration:', mem, 'MB')
-
+        mem1 = (endmem - startmem) / 1024**2
+        print('Memory per layer: {0:d}MB'.format(int(mem1)))
+        
+#         # test memory requirements (offset + two layer)
+#         torch.cuda.empty_cache()
+#         startmem = torch.cuda.memory_cached(self.gpu_device)
+#         x = self.xtest
+#         for layers in self.network[:2]:
+#             for sub in layers:
+#                 x = sub(x,device=self.gpu_device)
+#         loss = self.lossFunc(x,self.xtest)
+#         loss.backward()
+#         endmem = torch.cuda.memory_cached(self.gpu_device)
+#         mem2 = (endmem - startmem) / 1024**2
+#         print('Memory per two layer: {0:d}MB'.format(int(mem2)))
+#         torch.cuda.empty_cache()
+        
         # assess how many checkpoints
         N = len(self.network)
-        totalmem = mem * N
+        totalmem = (mem1) * N
         print('Total memory:', totalmem, 'MB')
 
         if totalmem > self.memlimit:
             print('Requires memory-efficient learning!')
             self.M = np.ceil(totalmem/self.memlimit)
             print('Checkpointing every:',int(self.M))
-            self.cpList = list(range(int(self.M),int(N-1),int(self.M)))
+            self.cpList = list(range(1,int(N-self.M),int(self.M)))
             self.meldFlag = True
+            print('Checkpoints:',self.cpList)
         else:
             self.cpList = [-1]
             self.M = 1
