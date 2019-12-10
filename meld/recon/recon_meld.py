@@ -181,7 +181,7 @@ class UnrolledNetwork():
                 xk = layer.forward(xk,device=self.gpu_device)
 
             # backward call
-            xk.backward(qk)
+            xk.backward(qk, retain_graph=True)
             with torch.no_grad():
                 qk = xkm1.grad
         return X
