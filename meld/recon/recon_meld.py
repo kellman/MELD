@@ -1,3 +1,5 @@
+
+
 import torch
 import torch.nn as nn
 import numpy as np
@@ -41,7 +43,7 @@ class UnrolledNetwork():
         
         if ckptFlag != 0:
             N = len(network)
-            self.cpList = np.sort(list(np.linspace(int(N-ckptFlag),1,int(ckptFlag), dtype=np.int32)))
+            self.cpList = np.sort(list(np.linspace(1,int(N),int(ckptFlag), dtype=np.int32, endpoint=False)))
         
     def setup(self):
         for p_ in self.network.parameters(): p_.requires_grad_(True)
