@@ -1,3 +1,5 @@
+
+
 import torch
 import torch.nn as nn
 import numpy as np
@@ -20,14 +22,15 @@ def makeNetwork(opList, N):
 
 # network evaluator (forward/backward)
 class UnrolledNetwork():
-    def __init__(self, model, xtest, memlimit, loss=None, setupFlag=True, ckptFlag=0, unsuperFlag=False, device='cpu'):
+    def __init__(self, model, xtest, memlimit, loss=None, setupFlag=True, ckptFlag=0, device='cpu',dtype=torch.float32):
         super(UnrolledNetwork, self).__init__()
         self.model = model
         self.network = self.model.network
         self.xtest = xtest
         self.memlimit = memlimit
         self.gpu_device = device
-        
+        self.dtype = dtype
+
         # setup hybrid checkpointing
         self.meldFlag = True # default
         self.cpList = [-1] # default
@@ -112,14 +115,14 @@ class UnrolledNetwork():
         # setup storage (for debugging)
         if interFlag:
             size = [len(self.network)] + [a for a in x0.shape]
-            Xall = torch.zeros(size,device=self.gpu_device)
+            Xall = torch.zeros(size,device=self.gpu_device,dtype=self.dtype)
         else:
             Xall = None
 
         # setup checkpointing
         if self.cpList is not []:
             size = [len(self.cpList)] + [a for a in x0.shape]
-            self.Xcp = torch.zeros(size,device=self.gpu_device)
+            self.Xcp = torch.zeros(size,device=self.gpu_device,dtype=self.dtype)
         else:
             self.Xcp = None
         cp = 0
@@ -153,7 +156,7 @@ class UnrolledNetwork():
     def differentiate(self,xN,qN,interFlag=False):
         if interFlag:
             size = [len(self.network)] + [a for a in xN.shape]
-            X = torch.zeros(size, device=self.gpu_device)
+            X = torch.zeros(size, device=self.gpu_device,dtype=self.dtype)
         else:
             X = None
 
@@ -190,7 +193,7 @@ class UnrolledNetwork():
                 xk = layer.forward(xk,device=self.gpu_device)
 
             # backward call
-            xk.backward(qk)
+            xk.backward(qk, retain_graph=True)
             with torch.no_grad():
                 qk = xkm1.grad
         return X
