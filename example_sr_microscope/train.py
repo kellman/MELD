@@ -103,7 +103,7 @@ if __name__ == '__main__':
     # Setup network for learning (args.meldFLAG overrides setup memory estimates)
     input_data, output_data = dataset[0]
     xtest = network.initialize(input_data[:1,...].to(device), device=device)
-    trainable_network = UnrolledNetwork(network.network, 
+    trainable_network = UnrolledNetwork(network, 
                                         xtest, 
                                         memlimit=args.memlimit, 
                                         loss=loss_func,

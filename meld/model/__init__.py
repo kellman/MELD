@@ -9,3 +9,5 @@ from .waveletsoftthr import shrinkage
 from .waveletsoftthr import soft_thr
 
 from .pytorch_transforms import Wavelet2
+
+from .softthr import isoftthr

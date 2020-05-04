@@ -130,7 +130,6 @@ class fpm(pbn_layer):
             output2 = torch.ifft(output2,2)
             g_tmp = torch.matmul(output2.permute(1,2,3,0),self.C[meas_index,:])
             g = g + g_tmp
-#         return -1 * self.alpha * g, cost
         return g
     
     def generateSingleMeas(self,field,device="cpu"):
@@ -153,6 +152,13 @@ class fpm(pbn_layer):
         output = abs2_c(output)
         multiMeas = torch.matmul(output.permute(1,2,0),self.C.permute(1,0)).permute(2,0,1)
         return multiMeas
+    
+    def loss_l2(self, field, device="cpu"):
+        est_single_meas = self.generateSingleMeas(field, device=device)
+#         print(est_single_meas.shape)
+#         print(self.measurements.shape)
+        res = est_single_meas - self.measurements
+        return torch.sum(res**2)
     
     def generateCrop(self, ):
         # only really need on-axis crop for effective camera pixel size.

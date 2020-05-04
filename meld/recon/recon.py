@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import scipy.io as sio
 import sys
 
-# making networks
+# making physics-based networks
 def GD(grad):
     return nn.ModuleList([grad])
 
@@ -18,10 +18,12 @@ def genNetwork(layer,N):
 def makeNetwork(opList, N):
     return genNetwork(nn.ModuleList(opList), N)
 
+# network evaluator (forward/backward)
 class UnrolledNetwork():
-    def __init__(self, network, xtest, memlimit, loss=None, setupFlag=True, ckptFlag=0, device='cpu'):
+    def __init__(self, model, xtest, memlimit, loss=None, setupFlag=True, ckptFlag=0, unsuperFlag=False, device='cpu'):
         super(UnrolledNetwork, self).__init__()
-        self.network = network
+        self.model = model
+        self.network = self.model.network
         self.xtest = xtest
         self.memlimit = memlimit
         self.gpu_device = device
@@ -31,8 +33,9 @@ class UnrolledNetwork():
         self.cpList = [-1] # default
         
         # setup loss function
+        self.unsuperFlag = unsuperFlag
         if loss is None:
-            self.lossFunc = lambda x,truth : torch.mean((x-truth)**2)
+            self.lossFunc = lambda x,truth,device : torch.mean((x-truth)**2)
         else:
             self.lossFunc = loss
             
@@ -40,7 +43,7 @@ class UnrolledNetwork():
             self.setup()
         
         if ckptFlag != 0:
-            N = len(network)
+            N = len(self.network)
             self.cpList = np.sort(list(np.linspace(int(N-ckptFlag),1,int(ckptFlag), dtype=np.int32)))
         
     def setup(self):
@@ -63,7 +66,10 @@ class UnrolledNetwork():
         x = self.xtest
         for sub in self.network[0]:
             x = sub(x,device=self.gpu_device)
-        loss = self.lossFunc(x,self.xtest)
+        if not self.unsuperFlag:
+            loss = self.lossFunc(x, self.xtest, self.gpu_device)
+        else:
+            loss = self.lossFunc(x, self.gpu_device)
         loss.backward()
 
         endmem = torch.cuda.memory_cached(self.gpu_device)
@@ -137,7 +143,10 @@ class UnrolledNetwork():
     def loss_eval(self, x0, truth, testFlag=True):
         with torch.no_grad():
             x, _, _ = self.evaluate(x0, testFlag=True)
-            loss = self.lossFunc(x, truth)
+            if not self.unsuperFlag:
+                loss = self.lossFunc(x, truth, self.gpu_device)
+            else:
+                loss = self.lossFunc(x, self.gpu_device)
             return x, loss
 
     
@@ -196,8 +205,13 @@ class UnrolledNetwork():
         
             # evaluate loss
             xN = xN.detach().requires_grad_(True)
+            
             # evaluate loss function
-            loss = self.lossFunc(xN,truth)
+            if not self.unsuperFlag:
+                loss = self.lossFunc(xN, truth, self.gpu_device)
+            else:
+                loss = self.lossFunc(xN, self.gpu_device)
+            
             loss.backward()
             qN = xN.grad
 
@@ -209,7 +223,10 @@ class UnrolledNetwork():
             # evaluate network
             xN,Xcp,Xforward = self.evaluate(x0, interFlag=interFlag, testFlag=False)
             # evaluate loss function
-            loss = self.lossFunc(xN,truth)
+            if not self.unsuperFlag:
+                loss = self.lossFunc(xN, truth, self.gpu_device)
+            else:
+                loss = self.lossFunc(xN, self.gpu_device)
             # reverse-mode differentiation
             loss.backward()
             Xbackward = None

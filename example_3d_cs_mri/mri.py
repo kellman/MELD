@@ -4,6 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import scipy.io as sio
 import sys
+import gc
 
 from meld.util.utility import *
 from meld.util.pytorch_complex import *
@@ -16,11 +17,11 @@ class MultiChannelMRI(nn.Module):
     def __init__(self, ndim=2, alpha=1e-2, mu=1e-2, testFlag=False, device='cpu', verbose=False):
         super(MultiChannelMRI,self).__init__()
     
-        assert ndim == 2, '3D not yet supported!'
+#         assert ndim == 2, '3D not yet supported!'
         # 3d support?
 
         self.ndim = ndim
-        
+         
         self.truth = None
         self.maps = None
         self.mask = None
@@ -39,16 +40,16 @@ class MultiChannelMRI(nn.Module):
 
         self.truth, self.maps, self.mask, self.ksp = imgs, maps, mask, ksp
         self.adjoint = self.model_adjoint(self.ksp).to(device) # setup 
-
+#         self.adjoint = self.model_adjoint(ksp).to(device)
         return self.adjoint
         
     def forward(self, x, max_iter=10, eps=1e-4, device='cpu'):
         # initialize with adjoint
-        return conjgrad(self.adjoint * 0., 
+        return conjgrad(x.size(), 
                         self.adjoint + self.mu * x, 
                         self.model_reg_normal, 
                         max_iter = max_iter,
-                        eps = eps, verbose = self.verbose) 
+                        eps = eps, verbose = self.verbose, device=device) 
 
     def reverse(self, x, device='cpu'):
         return (1/self.mu) * (self.model_reg_normal(x) - self.adjoint)
@@ -86,11 +87,15 @@ def fft_adj(x, ndim=2):
 
 def mask_forw(y, mask, ndim=2):
 #     print(y.size(), mask.size())
-    return y * mask[:,None,:,:,None]
+    if ndim == 2:
+        return y * mask[:,None,:,:,None]
+    elif ndim == 3:
+        return y * mask[:,None,None,:,:,None]
 
 def sense_forw(img, maps, mask, ndim=2):
     return mask_forw(fft_forw(maps_forw(img, maps)), mask, ndim)
 
+# mask_forw here is redundant?
 def sense_adj(ksp, maps, mask, ndim=2):
     return maps_adj(fft_adj(mask_forw(ksp, mask)), maps)
 
@@ -112,40 +117,51 @@ def ip_batch(x):
     return dot_batch(x, x)
 
 
-def conjgrad(x, b, Aop_fun, max_iter=50, l2lam=0., eps=1e-4, verbose=True):
+def conjgrad(x_size, b, Aop_fun, max_iter=50, l2lam=0., eps=1e-4, verbose=True, device='cpu'):
     ''' batched conjugate gradient descent. assumes the first index is batch size '''
 
     # explicitly remove r from the computational graph
+    x = torch.zeros(*x_size).to(device)
     r = b.new_zeros(b.shape, requires_grad=False)
-
+    
     # the first calc of the residual may not be necessary in some cases...
     if l2lam > 0:
         r = b - (Aop_fun(x) + l2lam * x)
     else:
         r = b - Aop_fun(x)
+    
+    del b
     p = r
 
     rsnot = ip_batch(r)
     rsold = rsnot
     rsnew = rsnot
+    del rsnot
 
     eps_squared = eps ** 2
 
     reshape = (-1,) + (1,) * (len(x.shape) - 1)
     for i in range(max_iter):
-        
-        if rsnew.max() < eps and verbose:
+#         print(i, rsold.max())
+#         print(torch.cuda.memory_allocated() / 1e9)
+        if rsold.max().item() < eps:
             # print this value...
-            print('Hit eps after', i)
+            if verbose:
+                print('Hit eps after', i)
             break
+
+#         for obj in gc.get_objects():
+#             try:
+#                 if torch.is_tensor(obj) or (hasattr(obj, 'data') and torch.is_tensor(obj.data)):
+#                     print(type(obj), obj.size())
+#             except: pass
 
         if l2lam > 0:
             Ap = Aop_fun(p) + l2lam * p
         else:
             Ap = Aop_fun(p)
-        pAp = dot_batch(p, Ap)
 
-        alpha = (rsold / pAp).reshape(reshape)
+        alpha = (rsold / dot_batch(p, Ap)).reshape(reshape)
 
         x = x + alpha * p
         r = r - alpha * Ap
@@ -155,7 +171,12 @@ def conjgrad(x, b, Aop_fun, max_iter=50, l2lam=0., eps=1e-4, verbose=True):
         beta = (rsnew / rsold).reshape(reshape)
 
         rsold = rsnew
-
+        del rsnew
+        del Ap
+        
         p = beta * p + r
+        
+#         print(alpha.size(), beta.size())
+
 
     return x

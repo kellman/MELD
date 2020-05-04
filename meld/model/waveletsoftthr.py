@@ -4,6 +4,7 @@ import numpy as np
 from meld.util.pytorch_complex import *
 from meld.model.pytorch_transforms import Wavelet2
 from meld.model import pbn_layer
+from meld.util import getAbs, getPhase
 
 np_dtype = np.float32
 dtype = torch.float32
@@ -52,25 +53,28 @@ class abs_wavelet_soft_thr(pbn_layer):
         self.device = device
         
     def forward(self, x, shiftx=False, shifty=False, device='cpu'):
-        amp = getAbs(x)
-        phase = getPhase(x)
+#         print(x.shape)
+        amp = getAbs(x)[0,...]
+        phase = getPhase(x)[0,...]
+#         print(amp.shape, phase.shape)
 
         a = self.trans.forward(amp,shiftx,shifty,device=self.device)
         a_s = [a[0],self.prox(a[1]),self.prox(a[2]),self.prox(a[3])]
-        x = self.trans.reverse(a_s,shiftx,shifty,device=self.device)        
+        out = self.trans.reverse(a_s,shiftx,shifty,device=self.device)        
 
-        x = self.getExp(x,phase)
+        out2 = x.clone() #= self.getExp(,phase).unsqueeze(0)
+        out2[0,...] = out[...,None]*out2[0,...]/(amp[...,None] + 1e-7)
         return x
 
     def reverse(self, z, shiftx=False, shifty=False, device='cpu'):
-        amp = getAbs(z)
-        phase = getPhase(z)
+        amp = getAbs(z)[0,...]
+        phase = getPhase(z)[0,...]
 
         a = self.trans.forward(amp,shiftx,shifty,device=self.device)
         a_s = [a[0],self.prox.inverse(a[1]),self.prox.inverse(a[2]),self.prox.inverse(a[3])]
         z = self.trans.reverse(a_s,shiftx,shifty,device=self.device)  
 
-        z = self.getExp(z,phase)
+        z = self.getExp(z,phase).unsqueeze(0)
 
         return z
 
