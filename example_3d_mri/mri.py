@@ -14,7 +14,7 @@ import lib_complex as cp
 np_dtype = np.float32
 
 class MultiChannelMRI(nn.Module):
-    def __init__(self, ndim=2, alpha=1e-2, mu=1e-2, testFlag=False, device='cpu', verbose=False):
+    def __init__(self, ndim=2, alpha=1e-2, mu=1e-2, testFlag=False, device='cpu', verbose=False, conj_back=True):
         super(MultiChannelMRI,self).__init__()
     
 #         assert ndim == 2, '3D not yet supported!'
@@ -28,6 +28,8 @@ class MultiChannelMRI(nn.Module):
         self.ksp = None
         self.adjoint = None
         self.verbose = verbose
+        self.device = device
+        self.conj_back = conj_back
         
         # parameters
         self.alpha = nn.Parameter(torch.from_numpy(np.asarray([alpha]).astype(np_dtype))).to(device)
@@ -43,13 +45,21 @@ class MultiChannelMRI(nn.Module):
 #         self.adjoint = self.model_adjoint(ksp).to(device)
         return self.adjoint
         
-    def forward(self, x, max_iter=10, eps=1e-4, device='cpu'):
+    def forward(self, x, max_iter=30, eps=1e-4, device='cpu'):
         # initialize with adjoint
-        return conjgrad(x.size(), 
-                        self.adjoint + self.mu * x, 
-                        self.model_reg_normal, 
-                        max_iter = max_iter,
-                        eps = eps, verbose = self.verbose, device=device) 
+        if self.conj_back:        
+            return ConjGrad_MoDL.apply(x, self.adjoint + self.mu * x,
+                          self.model_reg_normal,
+                          max_iter,
+                          self.mu,
+                          eps, self.verbose, device)
+        else:
+            return conjgrad(x.size(), 
+                            self.adjoint + self.mu * x, 
+                            self.model_reg_normal, 
+                            max_iter = max_iter,
+                            eps = eps, verbose = self.verbose, device=device)            
+    
 
     def reverse(self, x, device='cpu'):
         return (1/self.mu) * (self.model_reg_normal(x) - self.adjoint)
@@ -72,6 +82,24 @@ class MultiChannelMRI(nn.Module):
     def nrmse(self, x, truth):
         with torch.no_grad():
             return ((x - truth).pow(2).sum() / truth.pow(2).sum()).sqrt()
+
+
+class ConjGrad_MoDL(torch.autograd.Function):
+
+    @staticmethod
+    def forward(ctx, x, b, Aop_fun, max_iter, l2lam, eps, verbose, device):
+        ctx.b = b
+        ctx.Aop_fun = Aop_fun
+        ctx.max_iter = max_iter
+        ctx.l2lam = l2lam
+        ctx.eps = eps
+        ctx.verbose = verbose
+        ctx.device = device
+        return conjgrad(x.shape, b, Aop_fun, max_iter, 0, eps, verbose, device)
+
+    @staticmethod
+    def backward(ctx, grad_out):
+        return ctx.l2lam * conjgrad(x_size=grad_out.shape, b=grad_out, Aop_fun=ctx.Aop_fun, max_iter=ctx.max_iter, eps=ctx.eps, verbose=ctx.verbose, device=ctx.device), None, None, None, None, None, None, None
 
 def maps_forw(img, maps, ndim=2):
     return cp.zmul(img[:,None,...], maps)
@@ -97,10 +125,10 @@ def sense_forw(img, maps, mask, ndim=2):
 
 # mask_forw here is redundant?
 def sense_adj(ksp, maps, mask, ndim=2):
-    return maps_adj(fft_adj(mask_forw(ksp, mask)), maps)
+    return maps_adj(fft_adj(mask_forw(ksp, mask, ndim=ndim), ndim=ndim), maps)
 
 def sense_normal(img, maps, mask, ndim=2):
-    return maps_adj(fft_adj(mask_forw(fft_forw(maps_forw(img, maps)), mask)), maps)
+    return maps_adj(fft_adj(mask_forw(fft_forw(maps_forw(img, maps), ndim=ndim), mask, ndim=ndim), ndim=ndim), maps)
 
 
 # conjugate gradient algorithm
@@ -122,7 +150,7 @@ def conjgrad(x_size, b, Aop_fun, max_iter=50, l2lam=0., eps=1e-4, verbose=True, 
 
     # explicitly remove r from the computational graph
     x = torch.zeros(*x_size).to(device)
-    r = b.new_zeros(b.shape, requires_grad=False)
+    r = b.new_zeros(b.shape, requires_grad=False).to(device)
     
     # the first calc of the residual may not be necessary in some cases...
     if l2lam > 0:

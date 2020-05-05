@@ -15,7 +15,7 @@ import math
 # from mri import sense_adj
 
 class dataloader(Dataset):
-    def __init__(self, path, noise_std, mask_path=None, maps_path=None, device='cpu'):
+    def __init__(self, path, noise_std, mask_path=None, maps_path=None, device='cpu', maskshift=True, numcoils=12):
         super(dataloader,self).__init__()
 
         self.path = path
@@ -27,6 +27,8 @@ class dataloader(Dataset):
         self.mask_path = mask_path
         self.maps_path = maps_path
         self.device = device
+        self.maskshift = maskshift
+        self.numcoils = numcoils
         
     def __len__(self,):
         with h5py.File(self.path, 'r') as F:
@@ -38,15 +40,17 @@ class dataloader(Dataset):
 #         start_idx = self.batch_size * idx
 #         end_idx = self.batch_size * (idx + 1)
 #         indices = [idx for idx in range(start_idx,end_idx)]
-        imgs, maps, masks = load_data(idx, self.path, mask_path=self.mask_path, maps_path=self.maps_path)
+        imgs, maps, masks = load_data(idx, self.path, mask_path=self.mask_path, maps_path=self.maps_path, numcoils = self.numcoils)
 #         print(imgs.shape, maps.shape, masks.shape)
 #         meas = self._sim_data(imgs, maps, masks)
-        masks = fftshift(masks)
+        if self.maskshift:
+            masks = fftshift(masks)
         imgs_0 = torch.tensor(cp.c2r(imgs).astype(self.np_dtype))
         maps_0 = torch.tensor(cp.c2r(maps).astype(self.np_dtype))
         mask_0 = torch.tensor(masks.astype(self.np_dtype))
-        if (len(maps_0.size()) == 6):
-            maps_0 = maps_0.permute(0, 2, 1, 3, 4, 5)
+#         if (len(maps_0.size()) == 6):
+#             maps_0 = maps_0.permute(0, 2, 1, 3, 4, 5)
+#         print(imgs_0.size(), maps_0.size(), mask_0.size())
         meas_0 = self._sim_data(imgs_0, maps_0, mask_0)
 #         adj = sense_adj(meas_0, maps_0, mask_0)
 #         print(imgs.shape, maps.shape, masks.shape)
@@ -73,11 +77,11 @@ class dataloader(Dataset):
         return masked_mapped_fft_noisy
 
 
-def load_data(idx, data_file, gen_masks=False, mask_path=None, maps_path=None):
+def load_data(idx, data_file, numcoils, gen_masks=False, mask_path=None, maps_path=None):
     with h5py.File(data_file, 'r') as F:
         imgs = np.array(F['imgs'][idx,...], dtype=np.complex)
         if maps_path is None:
-            maps = np.array(F['maps'][idx,...], dtype=np.complex)
+            maps = np.array(F['maps'][idx,:numcoils,...], dtype=np.complex)
         if not gen_masks:
             try:
                 if mask_path is None:
@@ -93,7 +97,7 @@ def load_data(idx, data_file, gen_masks=False, mask_path=None, maps_path=None):
         
     if maps_path:    
         with h5py.File(maps_path, 'r') as F:
-            maps = np.array(F['maps'][idx,...], dtype=np.complex)
+            maps = np.array(F['maps'][idx,:numcoils,...], dtype=np.complex)
 
     if len(masks.shape) == 2:
         imgs, maps, masks = imgs[None,...], maps[None,...], masks[None,...]

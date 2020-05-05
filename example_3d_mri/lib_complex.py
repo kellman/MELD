@@ -20,12 +20,18 @@ def r2c(x):
 
 def zmul(x1, x2):
     ''' complex-valued multiplication '''
+    result = torch.zeros_like(x2)
     xr = x1[...,0] * x2[...,0] -  x1[...,1] * x2[...,1]
     xi = x1[...,0] * x2[...,1] +  x1[...,1] * x2[...,0]
+#     result[...,0] += x1[...,0]*x2[...,0]
+#     result[...,0] -= x1[...,1]*x2[...,1]
+#     result[...,1] += x1[...,0]*x2[...,1]
+#     result[...,1] += x1[...,1]*x2[...,0]
     if type(x1) is np.ndarray:
         return np.stack((xr, xi), axis=-1)
     elif type(x1) is torch.Tensor:
         return torch.stack((xr, xi), dim=-1)
+        return result
     else:   
         return xr, xi
 
