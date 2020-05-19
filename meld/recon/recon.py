@@ -22,7 +22,7 @@ def makeNetwork(opList, N):
 
 # network evaluator (forward/backward)
 class UnrolledNetwork():
-    def __init__(self, model, xtest, memlimit, loss=None, setupFlag=True, ckptFlag=0, device='cpu',dtype=torch.float32):
+    def __init__(self, model, xtest, memlimit, loss=None, setupFlag=True, ckptFlag=0, unsuperFlag=False, device='cpu',dtype=torch.float32):
         super(UnrolledNetwork, self).__init__()
         self.model = model
         self.network = self.model.network
